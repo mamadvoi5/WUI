@@ -842,7 +842,6 @@ ACME_install_Get_SSL_auto(){
 
 
 sudo systemctl stop haproxy
-sudo systemctl stop apache2
 sudo x-ui stop
 curl https://get.acme.sh | sh -s email=info@$domain_auto
 
