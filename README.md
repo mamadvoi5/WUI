@@ -46,7 +46,7 @@ VLESS TCP/GRPC REALITY
 <p>1. نصب اسکریپت</p>
 
 ```
-git clone https://github.com/azavaxhuman/WUI.git /root/wui-dds && chmod +x /root/wui-dds/install.sh && /root/wui-dds/install.sh
+git clone https://github.com/mamadvoi5/WUI.git /root/wui-dds && chmod +x /root/wui-dds/install.sh && /root/wui-dds/install.sh
 ```
 <br><br>
 <p>2. اجرای اسکریپت</p>
