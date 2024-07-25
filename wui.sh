@@ -33,20 +33,7 @@ generateRandomPort() {
 preinstall(){
 
 sudo apt update
-sudo apt install -y apache2 \
-                 ghostscript \
-                 libapache2-mod-php \
-                 mysql-server \
-                 php \
-                 php-bcmath \
-                 php-curl \
-                 php-imagick \
-                 php-intl \
-                 php-json \
-                 php-mbstring \
-                 php-mysql \
-                 php-xml \
-                 php-zip \
+sudo apt install -y ghostscript \
                  toilet \
                  haproxy \
                  socat 
@@ -160,10 +147,6 @@ getinfo(){
     fi
     done
 
-    #Database Info
-    read -p "Enter Database Name for WordPress:" database_name
-    read -p "Enter Database UserName for WordPress:" database_user
-    read -p "Enter Database Password for WordPress:" database_pass
 
 
 
@@ -171,7 +154,6 @@ getinfo(){
 
 ACME_install_Get_SSL(){
 
-sudo systemctl stop apache2
 sudo x-ui stop
 curl https://get.acme.sh | sh -s email=info@$domain
 
@@ -230,108 +212,9 @@ sudo bash -c "cat $fullchain_path $key_path > $mixed_ssl_path"
 # sudo chmod 600 $ca_path
 sudo chown -R www-data:www-data /var/wui-certs
 
-sudo systemctl start apache2
 sudo x-ui start
 }
 
-
-installwordpress(){
-
-wp_port=$(generateRandomPort)
-
-
-
-    #------------ VARIABLES from GetInfo -----------------
-
-
-    # $domain
-    # $xui_path
-    # $xui_port
-    # $sub_status
-    # $sub_path
-    # $sub_port
-
-    #certificate_path
-    #fullchain_path
-    # key_path
-    # mixed_ssl_path
-    # ca_path
-    
-
-
- #--------------------DOwnload Worpress--------------
-sudo mkdir -p /var/www/$domain
-sudo chown -R www-data:www-data /var/www/$domain
-curl -o wordpress.tar.gz https://wordpress.org/latest.tar.gz
-tar -xzvf wordpress.tar.gz > /dev/null 2>&1
-sudo mv wordpress/* /var/www/$domain/
-sudo rm -rf wordpress wordpress.tar.gz
-
-
- #--------------------Apache Virtual Host--------------
-
-cat <<EOF | sudo tee /etc/apache2/sites-available/$domain.conf
-
-<VirtualHost 127.0.0.1:$wp_port>
-    ServerName $domain
-    DocumentRoot /var/www/$domain
-    <Directory  /var/www/$domain>
-        AllowOverride All
-        Require all granted
-    </Directory>
-
-</VirtualHost>
-
-EOF
-
-
-ports_conf_path="/etc/apache2/ports.conf"
-
-if [ ! -f "$ports_conf_path" ]; then
-    sudo touch "$ports_conf_path"
-fi
-
-sudo bash -c "cat > $ports_conf_path <<EOF
-Listen 127.0.0.1:$wp_port
-EOF"
-
-    #------------------------------MySQL Config------------------------
-
-sudo mysql -u root <<EOF
-CREATE DATABASE $database_name;
-CREATE USER '$database_user'@'localhost' IDENTIFIED BY '$database_pass';
-GRANT ALL PRIVILEGES ON $database_name.* TO '$database_user'@'localhost';
-FLUSH PRIVILEGES;
-EOF
-sudo service mysql start
-
-
-sudo -u www-data cp /var/www/$domain/wp-config-sample.php /var/www/$domain/wp-config.php
-sudo -u www-data sed -i "s/database_name_here/${database_name}/g" /var/www/$domain/wp-config.php
-sudo -u www-data sed -i "s/username_here/${database_user}/g" /var/www/$domain/wp-config.php
-sudo -u www-data sed -i "s/password_here/${database_pass}/g" /var/www/$domain/wp-config.php
-
-
-cat > /tmp/wp-additions.txt << EOF
-define('WP_HOME','https://$domain');
-define('WP_SITEURL','https://$domain');
-define('WP_ALLOW_MULTISITE', true);
-if( false !== strpos( \$_SERVER['HTTP_X_FORWARDED_PROTO'], 'https' ) ) {
-    \$_SERVER['HTTPS'] = 'on';
-}
-EOF
-
-sed -i "/\* Add any custom values between this line and the \"stop editing\" line. \*/r /tmp/wp-additions.txt" /var/www/$domain/wp-config.php
-
-
-sudo a2ensite $domain.conf
-sudo a2dissite 000-default
-sudo a2enmod rewrite 
-sudo a2enmod ssl
-sudo service apache2 reload
-sudo systemctl restart apache2
-
-}
 
 
 haproxy(){
@@ -496,12 +379,6 @@ echo "-------------------------- X-UI Database backup --------------------------
 echo ""
 echo "X-ui Backup file ->> /root/x-ui-backup/x-ui_backup.db"
 echo ""
-echo "------------------------------ WordPress ---------------------------------------"
-echo ""
-echo -e "${CYAN} WebSite URLs , Now you can open the site address and make additional WordPress settings!  ${RESET}"
-echo -e "${GREEN} with https : https://${domain} ${RESET}"
-echo -e "${GREEN} with http : http://${domain} ${RESET}"
-echo ""
 echo "----------------------------- X-UI Panel  --------------------------------------"
 echo ""
 echo -e "${CYAN} Xui Pannel URLs , Now you can open the XUI ,We strongly suggest to use https/tls mode to open the panel  ${RESET}"
@@ -514,12 +391,6 @@ echo -e "${CYAN} Subscription service configuration:  ${RESET}"
 echo -e "${GREEN} Listen IP : $sub_listen"
 echo -e "${GREEN} Subscription Port: $sub_port ${RESET}"
 echo -e "${GREEN} Subscription Path : $sub_path ${RESET}"
-echo ""
-echo "--------------------------- Mysql Database -------------------------------------"
-echo ""
-echo -e "${GREEN} DatabaseName : ${database_name} ${RESET} "
-echo -e "${GREEN} Database User : ${database_user} ${RESET}"
-echo -e "${GREEN} Database Pass : ${database_pass} ${RESET}"
 echo ""
 echo "-------------------------------- SSl  ------------------------------------------"
 echo ""
@@ -545,7 +416,6 @@ wordpress_only(){
             getinfo
             ACME_install_Get_SSL
                     if [ -f "$fullchain_path" ] ; then
-                    installwordpress
                     haproxy
                     show_information
                     else
@@ -777,12 +647,12 @@ cert_file_all_tcp_tls="${directory_path}/all_tcp_tls_certs.tmp"
 # ایجاد نسخه موقتی از فایل haproxy.cfg
 temp_cfg=$(mktemp)
 
-# حذف محتوای داخل بلوک‌ها
+# حذف محتوای داخل بلوکها
 sed '/#all_tcp_tls_certs_start/,/#all_tcp_tls_certs_end/{//!d}' $haproxy_cfg | \
 sed '/#all_tcp_tls_front_start/,/#all_tcp_tls_front_end/{//!d}' $haproxy_cfg | \
 sed '/#all_tcp_tls_backend_start/,/#all_tcp_tls_backend_end/{//!d}' > $temp_cfg
 
-# اضافه کردن محتوای فایل‌های tmp به بلوک‌های مربوطه
+# اضافه کردن محتوای فایلهای tmp به بلوکهای مربوطه
 awk -v front="$front_file_all_tcp_tls" -v back="$backend_file_all_tcp_tls" -v crt="$cert_file_all_tcp_tls" '
     /#all_tcp_tls_front_end/ {
         while ((getline line < front) > 0) {
@@ -859,7 +729,7 @@ backend_file_reality_tcp="${directory_path}/reality_tcp_backend.tmp"
 # ایجاد نسخه موقتی از فایل haproxy.cfg
 temp_cfg=$(mktemp)
 
-# حذف محتوای داخل بلوک‌ها
+# حذف محتوای داخل بلوکها
 sed '/#reality_tcp_front_start/,/#reality_tcp_front_end/{//!d}' $haproxy_cfg | \
 sed '/#reality_tcp_backend_start/,/#reality_tcp_backend_end/{//!d}' > $temp_cfg
 
@@ -898,7 +768,6 @@ get_ssl_for_configs(){
 
 local domain_sni=$1
 sudo systemctl stop haproxy
-sudo systemctl stop apache2
 sudo x-ui stop
 
 ~/.acme.sh/acme.sh \
@@ -908,7 +777,6 @@ sudo x-ui stop
 
 sudo bash -c "cat $ssl_path/$domain_sni-fullchain.pem $ssl_path/$domain_sni.key > $ssl_path/$domain_sni-mixed.pem"
 
-sudo systemctl start apache2
 sudo systemctl restart haproxy
 sudo x-ui start
 
@@ -1026,89 +894,10 @@ sudo bash -c "cat $fullchain_path_auto $key_path_auto > $mixed_ssl_path_auto"
 
 sudo chown -R www-data:www-data /var/wui-certs
 
-sudo systemctl start apache2
 sudo x-ui start
 
 }
-installwordpress_auto(){
 
-wp_port_auto=$(generateRandomPort)
-
-
-
- #--------------------DOwnload Worpress--------------
-sudo mkdir -p /var/www/$domain_auto
-sudo chown -R www-data:www-data /var/www/$domain_auto
-curl -o wordpress.tar.gz https://wordpress.org/latest.tar.gz
-tar -xzvf wordpress.tar.gz > /dev/null 2>&1
-sudo mv wordpress/* /var/www/$domain_auto/
-sudo rm -rf wordpress wordpress.tar.gz
-
-
- #--------------------Apache Virtual Host--------------
-
-cat <<EOF | sudo tee /etc/apache2/sites-available/$domain_auto.conf
-
-<VirtualHost 127.0.0.1:$wp_port_auto>
-    ServerName $domain_auto
-    DocumentRoot /var/www/$domain_auto
-    <Directory  /var/www/$domain_auto>
-        AllowOverride All
-        Require all granted
-    </Directory>
-
-</VirtualHost>
-
-EOF
-
-    #------------------------------Apache Port Config------------------------
-
-ports_conf_path="/etc/apache2/ports.conf"
-
-if [ ! -f "$ports_conf_path" ]; then
-    sudo touch "$ports_conf_path"
-fi
-
-sudo bash -c "cat > $ports_conf_path <<EOF
-Listen 127.0.0.1:$wp_port_auto
-EOF"
-
-    #------------------------------MySQL Config------------------------
-
-sudo mysql -u root <<EOF
-CREATE DATABASE $database_name_auto;
-CREATE USER '$database_user_auto'@'localhost' IDENTIFIED BY '$database_pass_auto';
-GRANT ALL PRIVILEGES ON $database_name_auto.* TO '$database_user_auto'@'localhost';
-FLUSH PRIVILEGES;
-EOF
-sudo service mysql start
-
-
-sudo -u www-data cp /var/www/$domain_auto/wp-config-sample.php /var/www/$domain_auto/wp-config.php
-sudo -u www-data sed -i "s/database_name_here/${database_name_auto}/g" /var/www/$domain_auto/wp-config.php
-sudo -u www-data sed -i "s/username_here/${database_user_auto}/g" /var/www/$domain_auto/wp-config.php
-sudo -u www-data sed -i "s/password_here/${database_pass_auto}/g" /var/www/$domain_auto/wp-config.php
-
-cat > /tmp/wp-additions_auto.txt << EOF
-define('WP_HOME','https://$domain_auto');
-define('WP_SITEURL','https://$domain_auto');
-define('WP_ALLOW_MULTISITE', true);
-if( false !== strpos( \$_SERVER['HTTP_X_FORWARDED_PROTO'], 'https' ) ) {
-    \$_SERVER['HTTPS'] = 'on';
-}
-EOF
-
-sed -i "/\* Add any custom values between this line and the \"stop editing\" line. \*/r /tmp/wp-additions_auto.txt" /var/www/$domain_auto/wp-config.php
-
-
-sudo a2ensite $domain_auto.conf
-sudo a2dissite 000-default
-sudo a2enmod rewrite 
-sudo a2enmod ssl
-sudo service apache2 reload
-sudo systemctl restart apache2
-
-}
 
 
 haproxy_auto(){
@@ -1262,12 +1051,6 @@ x-ui restart
 show_information_auto(){
 clear 
 echo ""
-echo "${CYAN}------------------------------ WordPress ---------------------------------------${RESET}"
-echo ""
-echo -e "${CYAN} WebSite URLs , Now you can open the site address and make additional WordPress settings!  ${RESET}"
-echo -e "${GREEN} with https : https://${domain_auto} ${RESET}"
-echo -e "${GREEN} with http : http://${domain_auto} ${RESET}"
-echo ""
 echo "${CYAN}----------------------------- X-UI Panel  --------------------------------------${RESET}"
 echo ""
 echo -e "${CYAN} Xui Pannel URLs , Now you can open the XUI ,We strongly suggest to use https/tls mode to open the panel  ${RESET}"
@@ -1285,12 +1068,6 @@ echo -e "${CYAN} About your subscription service:  ${RESET}"
 echo -e "${GREEN} Listen IP : ${sub_listen_auto}"
 echo -e "${GREEN} Subscription Port ( LISTEN ) : ${sub_port_auto} ${RESET}"
 echo -e "${GREEN} Subscription path : ${sub_path_auto} ${RESET}"
-echo ""
-echo "${CYAN}--------------------------- Mysql Database -------------------------------------${RESET}"
-echo ""
-echo -e "${GREEN} DatabaseName : ${database_name_auto} ${RESET} "
-echo -e "${GREEN} Database User : ${database_user_auto} ${RESET}"
-echo -e "${GREEN} Database Pass : ${database_pass_auto} ${RESET}"
 echo ""
 echo "${CYAN}-------------------------------- SSl  ------------------------------------------${RESET}"
 echo ""
@@ -1363,7 +1140,6 @@ echo ""
 get_ssl_global(){
 
 sudo systemctl stop haproxy
-sudo systemctl stop apache2
 sudo x-ui stop
 ssl_path="/var/wui-certs"
 echo "OK , Now Please Enter your Domain/Subdomain "
@@ -1392,7 +1168,6 @@ pvkey_path_global="/var/wui-certs/$domain_global.key"
         fi
 
 sudo systemctl restart haproxy
-sudo systemctl restart apache2
 sudo x-ui start
 
 
@@ -1408,14 +1183,14 @@ haproxy_cfg="/etc/haproxy/haproxy.cfg"
 directory_path="/root/configs_tmp"
 
 read -p "Please Enter Inbound Port " port_to_remove
-    # حذف بلوک از فایل‌های موقت
+    # حذف بلوک از فایلهای موقت
     sed -i "/#.*_${port_to_remove}_start/,/#.*_${port_to_remove}_end/d" $directory_path/*_front.tmp
     sed -i "/#.*_${port_to_remove}_start/,/#.*_${port_to_remove}_end/d" $directory_path/*_backend.tmp
 
     # حذف بلوک از فایل haproxy.cfg
     sed -i "/#.*_${port_to_remove}_start/,/#.*_${port_to_remove}_end/d" $haproxy_cfg
 
-    # ری‌استارت مجدد haproxy
+    # ریاستارت مجدد haproxy
     sudo systemctl restart haproxy
 
     echo "Inbound associated with port $port_to_remove has been successfully removed."
@@ -1434,12 +1209,12 @@ while true; do
     toilet -f mono9 -F gay " W + X-U I"
     echo -e "${RED}"
     echo "-----------------------------------------------------------------------------"
-    echo "------------------------ Youtube : @DailyDigitalSkills ----------------------"
+    echo "-----------------------------------------------------------------------------"
     echo "-----------------------------------------------------------------------------"
     echo -e "${RESET}"
     echo "Select an option:"
     echo ""
-    echo "${GREEN}1. Install ( Wordpreess + XUI)${RESET}"
+    echo "${GREEN}1. Install ( XUI)${RESET}"
     echo "${YELLOW}2. Add or Delete Inbounds${RESET}"
     echo "${YELLOW}3. Edit Config Files${RESET}"
     echo "${CYAN}4. Restart Services${RESET}"
@@ -1599,7 +1374,6 @@ while true; do
             }
             
             check_restart "haproxy"
-            check_restart "apache2"  
             check_restart "x-ui"
         ;;
         5)
@@ -1615,7 +1389,6 @@ while true; do
         }
 
         # بررسی وضعیت Apache
-        check_service_status apache2
         check_service_status haproxy
         check_service_status x-ui
         ;;
@@ -1633,20 +1406,7 @@ while true; do
             sudo rm -rf /root/configs_tmp/
 
             packages=(
-                "apache2"
                 "ghostscript"
-                "libapache2-mod-php"
-                "mysql-server"
-                "php"
-                "php-bcmath"
-                "php-curl"
-                "php-imagick"
-                "php-intl"
-                "php-json"
-                "php-mbstring"
-                "php-mysql"
-                "php-xml"
-                "php-zip"
                 "toilet"
                 "haproxy"
                 "socat"
