@@ -69,7 +69,7 @@ getinfo(){
     # Get user input for domain, xui panel path and port
     echo ""
 
-    read -p "Enter domain for ${GREEN}WordPress${RESET} (a.example.com) ->> " user_domain
+    read -p "Enter domain for ${GREEN}XUI Panel${RESET} (a.example.com) ->> " user_domain
     domain=$(echo $user_domain | sed -E 's#^(https?://)?([^/]+)(/.*)?#\2#')
 
     #xui Path
@@ -287,7 +287,6 @@ frontend http_front
     tcp-request inspect-delay 5s
     tcp-request content accept if HTTP
 
-    acl is_wordpress hdr(host) -i $domain
     acl path_xui path_beg /$xui_path/
 
     #vmess_http_block_front_start
@@ -297,9 +296,8 @@ frontend http_front
     #vmess_http_block_front_end
 
     use_backend xui_backend if path_xui
-    use_backend wordpress_backend if is_wordpress
     #http_base_front
-    default_backend wordpress_backend
+    default_backend xui_backend
 
     #vmess_http_block_backend_start
 
@@ -327,11 +325,9 @@ frontend https_front
 
     #all_tcp_tls_certs_end
     mode http
-    acl is_wordpress hdr(host) -i $domain
     acl path_xui path_beg /$xui_path/
     $sub_config
     use_backend xui_backend if path_xui
-    use_backend wordpress_backend if is_wordpress
 
     #all_tcp_tls_front_start
 
@@ -339,12 +335,8 @@ frontend https_front
 
     #all_tcp_tls_front_end
     http-request set-header X-Forwarded-Proto https if { ssl_fc }
-    default_backend wordpress_backend
+    default_backend xui_backend
 
-
-backend wordpress_backend
-    mode http
-    server wordpress 127.0.0.1:$wp_port 
 
 backend xui_backend
     mode http
@@ -823,7 +815,7 @@ get_info_auto(){
 
     # Get user input for domain, xui panel path and port
     
-    read -p "Enter domain for WordPress & XUI  (example.com):" user_domain_auto
+    read -p "Enter domain for XUI  (example.com):" user_domain_auto
     domain_auto=$(echo $user_domain_auto | sed -E 's#^(https?://)?([^/]+)(/.*)?#\2#')
     read -p "Do you want to add domains for subscription link ? ( ${GREEN} y ${RESET}/ ${RED} n ${RESET}) ->> " user_sub_status_auto
     if [ "$user_sub_status_auto" == "n" ] ; then
@@ -952,7 +944,6 @@ frontend http_front
     tcp-request inspect-delay 5s
     tcp-request content accept if HTTP
 
-    acl is_wordpress hdr(host) -i $domain_auto
     acl path_xui path_beg /$xui_path_auto/
 
     #vmess_http_block_front_start
@@ -962,9 +953,8 @@ frontend http_front
     #vmess_http_block_front_end
 
     use_backend xui_backend if path_xui
-    use_backend wordpress_backend if is_wordpress
     #http_base_front
-    default_backend wordpress_backend
+    default_backend xui_backend
 
     #vmess_http_block_backend_start
 
@@ -992,11 +982,9 @@ frontend https_front
 
     #all_tcp_tls_certs_end
     mode http
-    acl is_wordpress hdr(host) -i $domain_auto
     acl path_xui path_beg /$xui_path_auto/
     $sub_config_auto
     use_backend xui_backend if path_xui
-    use_backend wordpress_backend if is_wordpress
 
     #all_tcp_tls_front_start
 
@@ -1004,12 +992,8 @@ frontend https_front
 
     #all_tcp_tls_front_end
     http-request set-header X-Forwarded-Proto https if { ssl_fc }
-    default_backend wordpress_backend
-
-
-backend wordpress_backend
-    mode http
-    server wordpress 127.0.0.1:$wp_port_auto 
+    default_backend xui_backend
+ 
 
 backend xui_backend
     mode http
